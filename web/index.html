@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مستشفى الرعاية المديدة بالظهران - نظام حجز القاعات الموحد</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts - Tajawal -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Tajawal', sans-serif; }
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white !important; color: black !important; }
+        }
+        .print-only { display: none; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header Navigation Bar -->
+    <header class="bg-gradient-to-r from-teal-900 via-teal-800 to-teal-900 text-white shadow-lg sticky top-0 z-40 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3">
+            
+            <!-- Hospital Brand Logo & Title -->
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="w-11 h-11 bg-teal-700/80 rounded-2xl flex items-center justify-center border border-teal-500/30 shadow-inner">
+                    <i class="fa-solid fa-hospital-user text-amber-300 text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-base sm:text-lg leading-tight">مستشفى الرعاية المديدة بالظهران</h1>
+                    <p class="text-xs text-teal-200 font-medium">نظام حجز القاعات الموحد لجميع الأقسام</p>
+                </div>
+            </div>
+
+            <!-- Header Quick Action Controls -->
+            <div class="flex items-center flex-wrap gap-2 text-xs sm:text-sm">
+                
+                <!-- Google Sheets Sync Live Status -->
+                <div class="hidden lg:flex items-center gap-2 bg-teal-950/60 px-3 py-1.5 rounded-xl border border-teal-700/50">
+                    <span id="sheetSyncStatus" class="inline-flex items-center gap-1.5 text-emerald-300 font-bold text-xs">
+                        <i class="fa-solid fa-cloud-arrow-up text-xs text-emerald-400"></i> تم ربط الكتابة التلقائية وجلب البيانات من Google Sheets 🟢
+                    </span>
+                </div>
+
+                <!-- Google Sheet Direct Link -->
+                <a href="https://docs.google.com/spreadsheets/d/1Pkknc-VJFluTpNaGDHq6S5QhqFjLQT4p4MhA_u9DZE0/edit?usp=sharing" target="_blank" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 shadow">
+                    <i class="fa-solid fa-file-excel text-emerald-200 text-sm"></i>
+                    <span class="hidden sm:inline">Google Sheets 📊</span>
+                </a>
+
+                <!-- Manual Refresh / Sync Button -->
+                <button onclick="fetchLiveSheetBookings(true)" class="bg-teal-700 hover:bg-teal-600 text-white px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 shadow border border-teal-500/40">
+                    <i class="fa-solid fa-rotate text-xs"></i>
+                    <span>تحديث 🔄</span>
+                </button>
+
+                <!-- QR Code Launcher -->
+                <button onclick="openQRModal()" class="bg-amber-500 hover:bg-amber-400 text-slate-900 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 shadow">
+                    <i class="fa-solid fa-qrcode text-base"></i>
+                    <span>رمز QR للحجز</span>
+                </button>
+
+                <!-- Admin Mode Toggle Button -->
+                <button id="toggleRoleBtn" onclick="handleRoleToggle()" class="bg-white/15 hover:bg-white/25 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition border border-white/20 flex items-center gap-1.5">
+                    <i class="fa-solid fa-user-shield text-amber-300"></i>
+                    <span id="roleLabel">وضع مسؤول القاعات</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Workspace -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1 w-full">
+
+        <!-- Application Tabs Navigation -->
+        <div class="flex border-b border-slate-200 space-x-2 space-x-reverse overflow-x-auto no-print">
+            <button id="tabBtn-schedule" onclick="switchTab('schedule')" class="px-4 py-3 font-bold text-sm border-b-2 border-teal-700 text-teal-800 flex items-center gap-2 whitespace-nowrap">
+                <i class="fa-solid fa-calendar-days text-base"></i> جدول القاعات المباشر
+            </button>
+            <button id="tabBtn-book" onclick="switchTab('book')" class="px-4 py-3 font-bold text-sm border-b-2 border-transparent text-slate-500 hover:text-teal-700 flex items-center gap-2 whitespace-nowrap">
+                <i class="fa-solid fa-plus-circle text-base"></i> تقديم طلب حجز
+            </button>
+            <button id="tabBtn-log" onclick="switchTab('log')" class="px-4 py-3 font-bold text-sm border-b-2 border-transparent text-slate-500 hover:text-teal-700 flex items-center gap-2 whitespace-nowrap">
+                <i class="fa-solid fa-list-check text-base"></i> سجل الحجوزات الكامل
+            </button>
+            <button id="tabBtn-pending" onclick="switchTab('pending')" class="px-4 py-3 font-bold text-sm border-b-2 border-transparent text-slate-500 hover:text-teal-700 flex items-center gap-2 whitespace-nowrap relative">
+                <i class="fa-solid fa-clock-rotate-left text-base"></i> طلبات بانتظار الموافقة
+                <span id="pendingBadgeCount" class="bg-amber-500 text-slate-900 text-xs px-2 py-0.5 rounded-full font-black hidden">0</span>
+            </button>
+        </div>
+
+        <!-- ================= TAB 1: LIVE SCHEDULE GRID ================= -->
+        <section id="tab-schedule" class="space-y-4">
+            
+            <!-- Date Picker & Legend Bar -->
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+                
+                <!-- Date Controls -->
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <button onclick="changeDate(-1)" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition font-bold text-xs">
+                        <i class="fa-solid fa-chevron-right me-1"></i> اليوم السابق
+                    </button>
+                    <input type="date" id="scheduleDatePicker" onchange="renderScheduleGrid()" class="px-3 py-2 border border-slate-300 rounded-xl font-bold text-sm text-teal-900 focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                    <button onclick="changeDate(1)" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition font-bold text-xs">
+                        اليوم التالي <i class="fa-solid fa-chevron-left ms-1"></i>
+                    </button>
+                    <button onclick="setTodayDate()" class="px-3 py-2 bg-teal-50 text-teal-800 hover:bg-teal-100 font-bold rounded-xl transition text-xs border border-teal-200">
+                        اليوم
+                    </button>
+                </div>
+
+                <!-- Visual Color Legend -->
+                <div class="flex items-center flex-wrap gap-3 text-xs font-bold">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-100 text-red-800 border border-red-200">
+                        <span class="w-2.5 h-2.5 rounded-full bg-red-600"></span> محجوز 🔒 (غير متاح)
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 border border-amber-200">
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span> في الانتظار ⏳ (غير متاح)
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span> متاح للحجز 🟢
+                    </span>
+                </div>
+            </div>
+
+            <!-- Weekend Alert Banner -->
+            <div id="weekendNotice" class="hidden bg-rose-50 border-2 border-rose-200 p-6 rounded-2xl text-center space-y-2">
+                <i class="fa-solid fa-calendar-xmark text-4xl text-rose-500"></i>
+                <h3 class="font-extrabold text-lg text-rose-900">عطلة نهاية الأسبوع (إجازة رسمية)</h3>
+                <p class="text-xs text-rose-700 max-w-md mx-auto">القاعات التعليمية والاجتماعات غير متاحة للحجز يومي الجمعة والسبت. الرجاء اختيار تاريخ عمل من الأحد إلى الخميس.</p>
+            </div>
+
+            <!-- Halls Live Grid Schedule Table -->
+            <div id="scheduleGridContainer" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right border-collapse min-w-[700px]">
+                        <thead>
+                            <tr class="bg-slate-800 text-white text-xs sm:text-sm">
+                                <th class="p-4 w-36 font-extrabold border-b border-slate-700 text-center">الوقت / القاعة</th>
+                                <th class="p-4 font-bold border-b border-slate-700 text-center">
+                                    <div class="font-extrabold text-teal-300 text-base">القاعة الكبيرة</div>
+                                    <div class="text-[11px] text-slate-300 font-normal">سعة 100 شخص (مجهزة بالكامل)</div>
+                                </th>
+                                <th class="p-4 font-bold border-b border-slate-700 text-center">
+                                    <div class="font-extrabold text-amber-300 text-base">القاعة الزجاجية</div>
+                                    <div class="text-[11px] text-slate-300 font-normal">سعة 40 شخص (إطلالة زجاجية)</div>
+                                </th>
+                                <th class="p-4 font-bold border-b border-slate-700 text-center">
+                                    <div class="font-extrabold text-sky-300 text-base">القاعة الداخلية</div>
+                                    <div class="text-[11px] text-slate-300 font-normal">سعة 25 شخص (اجتماعات ورش)</div>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="scheduleGridBody" class="divide-y divide-slate-200 text-xs sm:text-sm">
+                            <!-- Rows generated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 2: BOOKING FORM ================= -->
+        <section id="tab-book" class="hidden space-y-4 max-w-3xl mx-auto">
+            <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-200 space-y-6">
+                
+                <div class="border-b border-slate-100 pb-4">
+                    <h2 class="font-extrabold text-xl text-teal-900 flex items-center gap-2">
+                        <i class="fa-solid fa-calendar-plus text-teal-700"></i> نموذج تقديم طلب حجز قاعة
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-1">قم بتعبئة البيانات التالية لإرسال طلب الحجز لمسؤول القاعات بالمستشفى.</p>
+                </div>
+
+                <form id="bookingForm" onsubmit="handleBookingSubmit(event)" class="space-y-4">
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Hall Selection -->
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1">اختر القاعة <span class="text-red-500">*</span></label>
+                            <select id="formHallSelect" onchange="updateFormTimeSlotOptions()" required class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                                <option value="">-- اختر القاعة --</option>
+                                <option value="h1">القاعة الكبيرة (سعة 100 شخص)</option>
+                                <option value="h2">القاعة الزجاجية (سعة 40 شخص)</option>
+                                <option value="h3">القاعة الداخلية (سعة 25 شخص)</option>
+                            </select>
+                        </div>
+
+                        <!-- Department Name -->
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1">اسم القسم المستفيد <span class="text-red-500">*</span></label>
+                            <input type="text" id="formDeptInput" required placeholder="مثال: قسم التمريض / التدريب" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Booking Date -->
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1">تاريخ الحجز <span class="text-red-500">*</span></label>
+                            <input type="date" id="formDateInput" onchange="updateFormTimeSlotOptions()" required class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-teal-900 focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                        </div>
+
+                        <!-- Time Slot Select -->
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1">الفترة الزمنية المتاحة <span class="text-red-500">*</span></label>
+                            <select id="formTimeSelect" required class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                                <option value="">-- اختر التاريخ والقاعة أولاً --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Lecture Title -->
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1">عنوان المحاضرة / الفعالية <span class="text-red-500">*</span></label>
+                            <input type="text" id="formTitleInput" required placeholder="مثال: ورشة إدارة أمن المرضى" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                        </div>
+
+                        <!-- Lecturer Name -->
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1">اسم المحاضر / المتحدث <span class="text-red-500">*</span></label>
+                            <input type="text" id="formLecturerInput" required placeholder="د. أحمد المحمد" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Applicant Name -->
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1">اسم مقدم الطلب <span class="text-red-500">*</span></label>
+                            <input type="text" id="formApplicantInput" required placeholder="سارة خالد" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                        </div>
+
+                        <!-- Phone / Extension -->
+                        <div>
+                            <label class="block text-xs font-extrabold text-slate-700 mb-1">رقم التحويلة / الجوال <span class="text-red-500">*</span></label>
+                            <input type="text" id="formPhoneInput" required placeholder="050xxxxxxx أو تحويلة 4421" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div>
+                        <label class="block text-xs font-extrabold text-slate-700 mb-1">ملاحظات وتجهيزات مطلوبة (اختياري)</label>
+                        <textarea id="formNotesInput" rows="2" placeholder="مثال: تجهيز أجهزة العرض الصوتية والبروجكتر..." class="w-full px-4 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none"></textarea>
+                    </div>
+
+                    <!-- Submit Actions -->
+                    <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                        <button type="button" onclick="switchTab('schedule')" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-600 font-bold text-xs hover:bg-slate-50 transition">
+                            إلغاء
+                        </button>
+                        <button type="submit" class="px-6 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs sm:text-sm shadow-md transition flex items-center gap-2">
+                            <i class="fa-solid fa-paper-plane"></i> إرسال طلب الحجز
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- ================= TAB 3: FULL LOG ================= -->
+        <section id="tab-log" class="hidden space-y-4">
+            <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h2 class="font-extrabold text-lg text-slate-800">سجل الحجوزات الموحد</h2>
+                        <p class="text-xs text-slate-500">استعراض كافة الحجوزات والسجلات المحفوظة في القاعدة السحابية و Google Sheets.</p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                        <input type="text" id="logSearchInput" onkeyup="filterLogTable()" placeholder="بحث باسم القسم أو الفعالية..." class="px-4 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none w-full sm:w-60">
+                        
+                        <a href="https://docs.google.com/spreadsheets/d/1Pkknc-VJFluTpNaGDHq6S5QhqFjLQT4p4MhA_u9DZE0/edit?usp=sharing" target="_blank" class="px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-excel"></i> Google Sheets 📊
+                        </a>
+
+                        <button onclick="openGoogleSheetSyncModal()" class="px-3 py-2 bg-teal-50 text-teal-800 border border-teal-200 font-bold text-xs rounded-xl hover:bg-teal-100 transition">
+                            <i class="fa-solid fa-gear"></i> إعداد المزامنة
+                        </button>
+
+                        <button onclick="exportBookingsToCSV()" class="px-3 py-2 bg-slate-800 text-white font-bold text-xs rounded-xl hover:bg-slate-700 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-download"></i> تصدير Excel
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                    <table class="w-full text-right text-xs sm:text-sm border-collapse">
+                        <thead class="bg-slate-100 text-slate-700 font-extrabold border-b border-slate-200">
+                            <tr>
+                                <th class="p-3">رمز الحجز</th>
+                                <th class="p-3">القاعة</th>
+                                <th class="p-3">التاريخ والوقت</th>
+                                <th class="p-3">القسم</th>
+                                <th class="p-3">عنوان الفعالية</th>
+                                <th class="p-3">المحاضر</th>
+                                <th class="p-3">الحالة</th>
+                                <th class="p-3 text-center">الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logTableBody" class="divide-y divide-slate-200">
+                            <!-- Log rows inserted via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= TAB 4: ADMIN PENDING APPROVALS ================= -->
+        <section id="tab-pending" class="hidden space-y-4">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                
+                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                    <div>
+                        <h2 class="font-extrabold text-lg text-amber-900 flex items-center gap-2">
+                            <i class="fa-solid fa-user-shield text-amber-600"></i> لوحة معالجة طلبات مسؤول القاعات
+                        </h2>
+                        <p class="text-xs text-slate-500">مراجعة الطلبات المعلقة واعتمادها أو رفضها فوراً.</p>
+                    </div>
+
+                    <!-- Policy Switcher -->
+                    <div class="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200 text-xs font-bold">
+                        <span>سياسة الحجز:</span>
+                        <button onclick="toggleBookingPolicy(true)" id="policyBtnTypeB" class="px-3 py-1.5 rounded-lg bg-teal-700 text-white">
+                            ب. بموافقة المسؤول (معتمد)
+                        </button>
+                        <button onclick="toggleBookingPolicy(false)" id="policyBtnTypeA" class="px-3 py-1.5 rounded-lg bg-slate-200 text-slate-700">
+                            أ. حجز مباشر تلقائي
+                        </button>
+                    </div>
+                </div>
+
+                <div id="pendingListContainer" class="space-y-3">
+                    <!-- Dynamic Pending Requests -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 mt-auto py-4 text-center text-xs text-slate-500 no-print">
+        <p>نظام حجز القاعات الإلكتروني © مستشفى الرعاية المديدة بالظهران - جميع الحقوق محفوظة</p>
+    </footer>
+
+    <!-- ================= MODAL WINDOWS ================= -->
+
+    <!-- 1. Passcode Protection Modal -->
+    <div id="passcodeModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl p-6 text-center space-y-4">
+            <div class="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <div>
+                <h3 class="font-extrabold text-lg text-slate-800">الدخول لوضع مسؤول القاعات</h3>
+                <p class="text-xs text-slate-500 mt-1">الرجاء إدخال الرقم السري المعتمد لمسؤول النظام (932497)</p>
+            </div>
+            <input type="password" id="passcodeInput" maxlength="6" placeholder="أدخل الرقم السري" class="w-full text-center tracking-widest text-xl font-bold px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+            <div class="flex justify-center gap-2">
+                <button onclick="closeModal('passcodeModal')" class="w-1/2 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-600 hover:bg-slate-50">إلغاء</button>
+                <button onclick="verifyPasscode()" class="w-1/2 py-2.5 rounded-xl bg-teal-700 text-white font-bold text-xs hover:bg-teal-800">تأكيد الدخول</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. QR Code Poster Modal -->
+    <div id="qrModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl p-6 text-center space-y-4 text-slate-800">
+            <div id="printableQRPoster" class="space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                <div class="text-xs font-bold text-teal-800">مستشفى الرعاية المديدة بالظهران</div>
+                <div class="font-extrabold text-base text-slate-900">رمز حجز القاعات التعليمية السريع</div>
+                
+                <div class="bg-white p-3 rounded-xl border border-slate-300 shadow-inner inline-block">
+                    <img id="qrImageElement" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Fdhahran-hospital-booking%2F%23bookTab" alt="QR Code" class="w-48 h-48 mx-auto">
+                </div>
+
+                <p class="text-[11px] text-slate-600">امسح الرمز بواسطة كاميرا الجوال للانتقال المباشر لنموذج حجز القاعة</p>
+            </div>
+
+            <div class="flex justify-center gap-2 no-print">
+                <button onclick="closeModal('qrModal')" class="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-600">إغلاق</button>
+                <button onclick="window.print()" class="px-5 py-2 rounded-xl bg-teal-700 text-white text-xs font-bold shadow flex items-center gap-1.5">
+                    <i class="fa-solid fa-print"></i> طباعة الملصق
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Google Sheets Integration Settings Modal -->
+    <div id="googleSheetsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl p-6 space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-base text-emerald-900 flex items-center gap-2">
+                    <i class="fa-solid fa-file-excel text-emerald-600 text-xl"></i> إعداد المزامنة الفورية مع Google Sheets
+                </h3>
+                <button onclick="closeModal('googleSheetsModal')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs space-y-1">
+                <div class="font-bold text-emerald-900">رابط شيت البيانات المعتمد للمستشفى:</div>
+                <a href="https://docs.google.com/spreadsheets/d/1Pkknc-VJFluTpNaGDHq6S5QhqFjLQT4p4MhA_u9DZE0/edit?usp=sharing" target="_blank" class="text-emerald-700 underline font-mono text-[11px] break-all">
+                    https://docs.google.com/spreadsheets/d/1Pkknc-VJFluTpNaGDHq6S5QhqFjLQT4p4MhA_u9DZE0/edit?usp=sharing
+                </a>
+            </div>
+
+            <div class="space-y-1.5">
+                <label class="block text-xs font-bold text-slate-700">رابط Google Apps Script Web App (للكتابة والتخزين التلقائي):</label>
+                <div class="flex gap-2">
+                    <input type="url" id="googleScriptUrlInput" placeholder="https://script.google.com/macros/s/AKfycb.../exec" class="flex-1 px-3 py-2.5 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-teal-500">
+                    <button onclick="saveGoogleScriptUrl()" class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition shadow">حفظ وإلحاق</button>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 text-slate-100 p-3 rounded-xl text-[11px] font-mono relative overflow-x-auto">
+                <button onclick="copyAppsScriptCode()" class="absolute top-2 left-2 bg-slate-700 hover:bg-slate-600 text-white px-2 py-0.5 rounded text-[10px]">نسخ الكود</button>
+                <pre id="appsScriptCodeText">function doPost(e) {
+  var sheet = SpreadsheetApp.openById('1Pkknc-VJFluTpNaGDHq6S5QhqFjLQT4p4MhA_u9DZE0').getActiveSheet();
+  var data = JSON.parse(e.postData.contents);
+  sheet.appendRow([data.id, data.hallName, data.date, data.timeSlot, data.dept, data.title, data.lecturer, data.applicant, data.phone, data.status, new Date()]);
+  return ContentService.createTextOutput(JSON.stringify({"result": "success"})).setMimeType(ContentService.MimeType.JSON);
+}</pre>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button onclick="closeModal('googleSheetsModal')" class="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold">إلغاء</button>
+                <button onclick="saveGoogleScriptUrl()" class="px-5 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold shadow">حفظ الرابط</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Booking Receipt Modal -->
+    <div id="receiptModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl p-6 space-y-4">
+            <div id="receiptPrintArea" class="space-y-4 p-4 border border-slate-200 rounded-2xl bg-slate-50">
+                <div class="text-center border-b border-slate-200 pb-3">
+                    <div class="font-extrabold text-teal-900 text-sm">مستشفى الرعاية المديدة بالظهران</div>
+                    <div class="text-xs text-slate-500">إشعار حجز قاعة رسمية</div>
+                    <div id="receiptCode" class="mt-1 inline-block bg-teal-100 text-teal-900 px-3 py-0.5 rounded-full text-xs font-mono font-bold">BK-0000</div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                    <div><span class="text-slate-500">القاعة:</span> <span id="receiptHall" class="font-bold"></span></div>
+                    <div><span class="text-slate-500">التاريخ:</span> <span id="receiptDate" class="font-bold"></span></div>
+                    <div><span class="text-slate-500">الموعد:</span> <span id="receiptTime" class="font-bold"></span></div>
+                    <div><span class="text-slate-500">القسم:</span> <span id="receiptDept" class="font-bold"></span></div>
+                    <div class="col-span-2"><span class="text-slate-500">عنوان الفعالية:</span> <span id="receiptTitle" class="font-bold"></span></div>
+                    <div><span class="text-slate-500">المحاضر:</span> <span id="receiptLecturer" class="font-bold"></span></div>
+                    <div><span class="text-slate-500">مقدم الطلب:</span> <span id="receiptApplicant" class="font-bold"></span></div>
+                    <div class="col-span-2"><span class="text-slate-500">الحالة:</span> <span id="receiptStatus" class="font-bold"></span></div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 no-print">
+                <button onclick="closeModal('receiptModal')" class="px-4 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-600">إغلاق</button>
+                <button onclick="window.print()" class="px-5 py-2 rounded-xl bg-teal-700 text-white text-xs font-bold shadow flex items-center gap-1">
+                    <i class="fa-solid fa-print"></i> طباعة الإشعار
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Popup -->
+    <div id="toastNotification" class="fixed bottom-5 left-5 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl text-xs font-bold hidden flex items-center gap-2 z-50 border border-slate-700">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+        <span id="toastMessage">تم العملية بنجاح</span>
+    </div>
+
+    <!-- Application Engine Logic JavaScript -->
+    <script>
+        // --- SYSTEM CONSTANTS & APPS SCRIPT URL ---
+        const ADMIN_PASSCODE = "932497";
+        const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzCo8Ga8IHDAVjiYwSzbLmcY8IpsUu5kHvEKF_vwXSEALUDpj__L3w7FzTpGZC15dsJJw/exec";
+        const GOOGLE_SHEET_PUB_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSpA-L7f-DkZfx6yzkDEsaZaltpJCWmQv4C79nXw8Mk3YLHd1_ZZL1oclHTDP-qO7Shqn2C8ocQqtmv/pub?output=csv";
+        
+        const HALLS = {
+            h1: { name: "القاعة الكبيرة", cap: 100 },
+            h2: { name: "القاعة الزجاجية", cap: 40 },
+            h3: { name: "القاعة الداخلية", cap: 25 }
+        };
+
+        const TIME_SLOTS = [
+            "08:00 - 09:00", "09:00 - 10:00", "10:00 - 11:00", "11:00 - 12:00",
+            "12:00 - 13:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00"
+        ];
+
+        // --- GLOBAL APP STATE ---
+        let bookings = [];
+        let isAdmin = false;
+        let isApprovalRequired = true; // Option B default
+        let googleScriptAppUrl = localStorage.getItem('googleScriptAppUrl') || DEFAULT_SCRIPT_URL;
+
+        // --- MODALS AND TOAST UTILITIES ---
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function openQRModal() {
+            openModal('qrModal');
+        }
+
+        function showToast(msg, isError = false) {
+            const toast = document.getElementById('toastNotification');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+            if (!toast || !toastMessage || !toastIcon) return;
+
+            toastMessage.textContent = msg;
+            if (isError) {
+                toastIcon.className = "fa-solid fa-circle-exclamation text-rose-400 text-base";
+                toast.className = "fixed bottom-5 left-5 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl text-xs font-bold flex items-center gap-2 z-50 border border-rose-500/50";
+            } else {
+                toastIcon.className = "fa-solid fa-circle-check text-emerald-400 text-base";
+                toast.className = "fixed bottom-5 left-5 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl text-xs font-bold flex items-center gap-2 z-50 border border-slate-700";
+            }
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3500);
+        }
+
+        // --- APPLICATION INITIALIZATION ---
+        window.onload = function() {
+            // التحديث التلقائي لرابط Apps Script الجديد
+            const savedUrl = localStorage.getItem('googleScriptAppUrl');
+            if (!savedUrl || savedUrl.includes('AKfycbxiG1FpARBWaD4t8bA8Vsx5BmiqezxL89LvuK24eO07e3FDbL_om9_FoXW2ZU5qFQkjnQ')) {
+                localStorage.setItem('googleScriptAppUrl', DEFAULT_SCRIPT_URL);
+            }
+            googleScriptAppUrl = localStorage.getItem('googleScriptAppUrl') || DEFAULT_SCRIPT_URL;
+
+            loadInitialBookings();
+            setTodayDate();
+            renderScheduleGrid();
+            renderLogTable();
+            updatePendingBadge();
+            
+            // جلب الحجوزات فوراً عند فتح التطبيق والتكرار كل 30 ثانية
+            fetchLiveSheetBookings(false);
+            setInterval(() => fetchLiveSheetBookings(false), 30000);
+        };
+
+        function loadInitialBookings() {
+            const saved = localStorage.getItem('dhahran_hospital_bookings');
+            if (saved) {
+                try {
+                    bookings = JSON.parse(saved);
+                } catch(e) {
+                    bookings = [];
+                }
+            }
+            if (!bookings || bookings.length === 0) {
+                const today = new Date().toISOString().split('T')[0];
+                bookings = [
+                    {
+                        id: "BK-1001",
+                        hallId: "h1",
+                        date: today,
+                        timeSlot: "09:00 - 10:00",
+                        dept: "قسم التمريض",
+                        title: "الممارسة السريرية المتقدمة",
+                        lecturer: "د. عبدالمجيد الغامدي",
+                        applicant: "فاطمة الشهري",
+                        phone: "4421",
+                        notes: "تجهيز بروجكتر",
+                        status: "approved"
+                    }
+                ];
+                saveBookingsState();
+            }
+        }
+
+        function saveBookingsState() {
+            localStorage.setItem('dhahran_hospital_bookings', JSON.stringify(bookings));
+            updatePendingBadge();
+        }
+
+        // --- TAB SWITCHER ---
+        function switchTab(tabId) {
+            ['schedule', 'book', 'log', 'pending'].forEach(id => {
+                const sec = document.getElementById(`tab-${id}`);
+                const btn = document.getElementById(`tabBtn-${id}`);
+                if (id === tabId) {
+                    sec.classList.remove('hidden');
+                    btn.className = "px-4 py-3 font-bold text-sm border-b-2 border-teal-700 text-teal-800 flex items-center gap-2 whitespace-nowrap";
+                } else {
+                    sec.classList.add('hidden');
+                    btn.className = "px-4 py-3 font-bold text-sm border-b-2 border-transparent text-slate-500 hover:text-teal-700 flex items-center gap-2 whitespace-nowrap";
+                }
+            });
+
+            if (tabId === 'schedule') renderScheduleGrid();
+            if (tabId === 'log') renderLogTable();
+            if (tabId === 'pending') renderPendingList();
+            if (tabId === 'book') updateFormTimeSlotOptions();
+        }
+
+        // --- DATE CONTROL & WEEKEND CHECK ---
+        function setTodayDate() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('scheduleDatePicker').value = today;
+            document.getElementById('formDateInput').value = today;
+            renderScheduleGrid();
+            updateFormTimeSlotOptions();
+        }
+
+        function changeDate(delta) {
+            const picker = document.getElementById('scheduleDatePicker');
+            const cur = new Date(picker.value || new Date());
+            cur.setDate(cur.getDate() + delta);
+            picker.value = cur.toISOString().split('T')[0];
+            renderScheduleGrid();
+        }
+
+        function isWeekend(dateStr) {
+            if (!dateStr) return false;
+            const day = new Date(dateStr).getDay();
+            return day === 5 || day === 6; // Friday (5) or Saturday (6)
+        }
+
+        // --- LIVE SCHEDULE GRID ENGINE ---
+        function renderScheduleGrid() {
+            const dateStr = document.getElementById('scheduleDatePicker').value;
+            const weekendNotice = document.getElementById('weekendNotice');
+            const gridContainer = document.getElementById('scheduleGridContainer');
+            const gridBody = document.getElementById('scheduleGridBody');
+
+            if (isWeekend(dateStr)) {
+                weekendNotice.classList.remove('hidden');
+                gridContainer.classList.add('hidden');
+                return;
+            } else {
+                weekendNotice.classList.add('hidden');
+                gridContainer.classList.remove('hidden');
+            }
+
+            gridBody.innerHTML = '';
+
+            TIME_SLOTS.forEach(slot => {
+                const tr = document.createElement('tr');
+                
+                // Time Slot Label Column
+                let html = `<td class="p-3 text-center font-bold bg-slate-50 text-slate-700 border-b border-slate-200">
+                    <i class="fa-regular fa-clock me-1 text-slate-400"></i> ${slot}
+                </td>`;
+
+                ['h1', 'h2', 'h3'].forEach(hallId => {
+                    const booking = bookings.find(b => b.date === dateStr && b.hallId === hallId && b.timeSlot === slot && b.status !== 'rejected');
+
+                    if (booking) {
+                        if (booking.status === 'approved') {
+                            // RED BOOKED CELL (Locks out booking, clicking shows printable details)
+                            html += `<td class="p-2 border-b border-slate-200 text-center">
+                                <div onclick="showReceiptModal('${booking.id}')" class="p-2.5 rounded-xl bg-red-500 text-white shadow-sm cursor-pointer hover:bg-red-600 transition text-right">
+                                    <div class="font-extrabold text-xs truncate">${booking.title}</div>
+                                    <div class="text-[11px] opacity-90 truncate"><i class="fa-solid fa-building text-[10px] me-1"></i>${booking.dept}</div>
+                                    <div class="mt-1 flex items-center justify-between text-[10px] font-bold bg-red-700/40 px-2 py-0.5 rounded-md">
+                                        <span>محجوز 🔒 (غير متاح)</span>
+                                        <i class="fa-solid fa-circle-info"></i>
+                                    </div>
+                                </div>
+                            </td>`;
+                        } else {
+                            // ORANGE PENDING CELL (Locks out booking)
+                            html += `<td class="p-2 border-b border-slate-200 text-center">
+                                <div onclick="showReceiptModal('${booking.id}')" class="p-2.5 rounded-xl bg-amber-500 text-slate-900 shadow-sm cursor-pointer hover:bg-amber-600 transition text-right">
+                                    <div class="font-extrabold text-xs truncate">${booking.title}</div>
+                                    <div class="text-[11px] text-slate-800 truncate"><i class="fa-solid fa-building text-[10px] me-1"></i>${booking.dept}</div>
+                                    <div class="mt-1 flex items-center justify-between text-[10px] font-bold bg-amber-700/30 px-2 py-0.5 rounded-md">
+                                        <span>في الانتظار ⏳ (غير متاح)</span>
+                                        <i class="fa-solid fa-circle-info"></i>
+                                    </div>
+                                </div>
+                            </td>`;
+                        }
+                    } else {
+                        // GREEN AVAILABLE CELL (+ Button fills form)
+                        html += `<td class="p-2 border-b border-slate-200 text-center">
+                            <button onclick="quickBook('${hallId}', '${dateStr}', '${slot}')" class="w-full py-2.5 px-3 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-600 hover:text-white transition font-bold text-xs flex items-center justify-center gap-1 group shadow-sm">
+                                <i class="fa-solid fa-plus group-hover:scale-110 transition-transform"></i> متاح للحجز
+                            </button>
+                        </td>`;
+                    }
+                });
+
+                tr.innerHTML = html;
+                gridBody.appendChild(tr);
+            });
+        }
+
+        function quickBook(hallId, dateStr, slot) {
+            document.getElementById('formHallSelect').value = hallId;
+            document.getElementById('formDateInput').value = dateStr;
+            updateFormTimeSlotOptions();
+            document.getElementById('formTimeSelect').value = slot;
+            switchTab('book');
+        }
+
+        // --- DYNAMIC FORM TIME SLOT DISABLING ---
+        function updateFormTimeSlotOptions() {
+            const hallId = document.getElementById('formHallSelect').value;
+            const dateStr = document.getElementById('formDateInput').value;
+            const timeSelect = document.getElementById('formTimeSelect');
+            const selectedVal = timeSelect.value;
+
+            timeSelect.innerHTML = '<option value="">-- اختر الفترة الزمنية --</option>';
+
+            if (!hallId || !dateStr) {
+                timeSelect.innerHTML = '<option value="">-- اختر التاريخ والقاعة أولاً --</option>';
+                return;
+            }
+
+            TIME_SLOTS.forEach(slot => {
+                const isBooked = bookings.some(b => b.date === dateStr && b.hallId === hallId && b.timeSlot === slot && b.status !== 'rejected');
+                const option = document.createElement('option');
+                option.value = slot;
+
+                if (isBooked) {
+                    option.textContent = `❌ ${slot} (محجوز - غير متاح)`;
+                    option.disabled = true;
+                    option.className = "text-red-600 font-bold bg-red-50";
+                } else {
+                    option.textContent = `🟢 ${slot} (متاح)`;
+                    option.className = "text-emerald-800 font-bold";
+                }
+
+                if (slot === selectedVal && !isBooked) {
+                    option.selected = true;
+                }
+                timeSelect.appendChild(option);
+            });
+        }
+
+        // --- SUBMIT BOOKING REQUEST ---
+        function handleBookingSubmit(e) {
+            e.preventDefault();
+
+            const hallId = document.getElementById('formHallSelect').value;
+            const dateStr = document.getElementById('formDateInput').value;
+            const timeSlot = document.getElementById('formTimeSelect').value;
+
+            if (isWeekend(dateStr)) {
+                showToast("عفواً، لا يمكن الحجز في عطلة نهاية الأسبوع (الجمعة والسبت).", true);
+                return;
+            }
+
+            const exists = bookings.some(b => b.date === dateStr && b.hallId === hallId && b.timeSlot === timeSlot && b.status !== 'rejected');
+            if (exists) {
+                showToast("عفواً، هذا الموعد محجوز بالفعل!", true);
+                return;
+            }
+
+            const newBooking = {
+                id: "BK-" + Math.floor(1000 + Math.random() * 9000),
+                hallId,
+                date: dateStr,
+                timeSlot,
+                dept: document.getElementById('formDeptInput').value.trim(),
+                title: document.getElementById('formTitleInput').value.trim(),
+                lecturer: document.getElementById('formLecturerInput').value.trim(),
+                applicant: document.getElementById('formApplicantInput').value.trim(),
+                phone: document.getElementById('formPhoneInput').value.trim(),
+                notes: document.getElementById('formNotesInput').value.trim(),
+                status: isApprovalRequired ? 'pending' : 'approved'
+            };
+
+            bookings.unshift(newBooking);
+            saveBookingsState();
+            syncToGoogleSheet(newBooking, 'create');
+
+            document.getElementById('bookingForm').reset();
+            showToast(isApprovalRequired ? "تم تقديم طلب الحجز بنجاح ⏳ بانتظار موافقة المسؤول" : "تم الحجز المباشر وتأكيد الموعد بنجاح 🟢");
+            
+            document.getElementById('scheduleDatePicker').value = dateStr;
+            renderScheduleGrid();
+            renderLogTable();
+            switchTab('schedule');
+        }
+
+        async function syncToGoogleSheet(bookingData, action = 'create') {
+            if (!googleScriptAppUrl) return;
+            try {
+                const payload = {
+                    ...bookingData,
+                    action: action,
+                    hallName: HALLS[bookingData.hallId] ? HALLS[bookingData.hallId].name : bookingData.hallId
+                };
+                await fetch(googleScriptAppUrl, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload)
+                });
+            } catch(e) {
+                console.warn("Sync notice:", e);
+            }
+        }
+
+        // --- FETCH LIVE GOOGLE SHEETS DATA (doGet & CSV) ---
+        async function fetchLiveSheetBookings(isManual = false) {
+            let fetchedData = null;
+
+            // 1. Fetch JSON via Apps Script Web App Endpoint (doGet)
+            if (googleScriptAppUrl) {
+                try {
+                    const res = await fetch(googleScriptAppUrl);
+                    if (res.ok) {
+                        const json = await res.json();
+                        if (Array.isArray(json) && json.length > 0) {
+                            fetchedData = json.map(parseSheetBookingItem).filter(Boolean);
+                        }
+                    }
+                } catch(e) {
+                    console.log("محاولة جلب البيانات من Apps Script API...", e);
+                }
+            }
+
+            // 2. Fallback: Published Google Sheets CSV Endpoint
+            if (!fetchedData && GOOGLE_SHEET_PUB_CSV) {
+                try {
+                    const res = await fetch(GOOGLE_SHEET_PUB_CSV);
+                    if (res.ok) {
+                        const csvText = await res.text();
+                        fetchedData = parseCSVBookings(csvText);
+                    }
+                } catch(e) {
+                    console.warn("فشل جلب CSV المنشور:", e);
+                }
+            }
+
+            // 3. Update local bookings array with incoming remote data
+            if (fetchedData && fetchedData.length > 0) {
+                fetchedData.forEach(item => {
+                    const existingIndex = bookings.findIndex(b => b.id === item.id || (b.date === item.date && b.hallId === item.hallId && b.timeSlot === item.timeSlot));
+                    if (existingIndex > -1) {
+                        // تحديث بيانات الحجز وحالته التقديمية فورياً بناءً على بيانات الشيت
+                        bookings[existingIndex] = { ...bookings[existingIndex], ...item };
+                    } else {
+                        bookings.push(item);
+                    }
+                });
+
+                saveBookingsState();
+                renderScheduleGrid();
+                renderLogTable();
+                renderPendingList();
+                updatePendingBadge();
+
+                if (isManual) {
+                    showToast(`تم جلب ومزامنة ${fetchedData.length} حجز من Google Sheets بنجاح 🔄`);
+                }
+            } else {
+                if (isManual) showToast("تم تحديث وحفظ البيانات محلياً ☁️");
+            }
+        }
+
+        function parseSheetBookingItem(item) {
+            if (!item || !item.date || !item.timeSlot) return null;
+            let hallId = item.hallId || 'h1';
+            if (item.hallName) {
+                if (item.hallName.includes("الكبيرة") || item.hallName === "h1") hallId = 'h1';
+                else if (item.hallName.includes("الزجاجية") || item.hallName === "h2") hallId = 'h2';
+                else if (item.hallName.includes("الداخلية") || item.hallName === "h3") hallId = 'h3';
+            }
+
+            let status = 'pending';
+            const s = (item.status || '').toString().toLowerCase();
+            if (s.includes('approved') || s.includes('محجوز') || s.includes('مؤكد')) status = 'approved';
+            else if (s.includes('rejected') || s.includes('مرفوض')) status = 'rejected';
+
+            return {
+                id: item.id || ("BK-" + Math.floor(1000 + Math.random() * 9000)),
+                hallId: hallId,
+                date: item.date,
+                timeSlot: item.timeSlot,
+                dept: item.dept || "قسم مستفيد",
+                title: item.title || "فعالية",
+                lecturer: item.lecturer || "-",
+                applicant: item.applicant || "-",
+                phone: item.phone || "-",
+                notes: item.notes || "",
+                status: status
+            };
+        }
+
+        function parseCSVBookings(csvText) {
+            const lines = csvText.split('\n').map(l => l.trim()).filter(Boolean);
+            if (lines.length <= 1) return [];
+
+            const parsed = [];
+            for (let i = 1; i < lines.length; i++) {
+                const row = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || lines[i].split(',');
+                if (row && row.length >= 4) {
+                    const clean = row.map(cell => cell.replace(/^"|"$/g, '').trim());
+                    const item = {
+                        id: clean[0],
+                        hallName: clean[1],
+                        date: clean[2],
+                        timeSlot: clean[3],
+                        dept: clean[4],
+                        title: clean[5],
+                        lecturer: clean[6],
+                        applicant: clean[7],
+                        phone: clean[8],
+                        notes: clean[9],
+                        status: clean[10]
+                    };
+                    const booking = parseSheetBookingItem(item);
+                    if (booking) parsed.push(booking);
+                }
+            }
+            return parsed;
+        }
+
+        // --- ADMIN ROLE & PASSCODE PROTECTION (932497) ---
+        function handleRoleToggle() {
+            if (isAdmin) {
+                isAdmin = false;
+                document.getElementById('roleLabel').textContent = "وضع مسؤول القاعات";
+                document.getElementById('toggleRoleBtn').className = "bg-white/15 hover:bg-white/25 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition border border-white/20 flex items-center gap-1.5";
+                showToast("تم الخروج من وضع المسؤول");
+                renderLogTable();
+                renderPendingList();
+            } else {
+                openModal('passcodeModal');
+            }
+        }
+
+        function verifyPasscode() {
+            const input = document.getElementById('passcodeInput').value.trim();
+            if (input === ADMIN_PASSCODE) {
+                isAdmin = true;
+                closeModal('passcodeModal');
+                document.getElementById('passcodeInput').value = '';
+                document.getElementById('roleLabel').textContent = "مسؤول القاعات (مُفعل 🔓)";
+                document.getElementById('toggleRoleBtn').className = "bg-amber-500 text-slate-900 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow transition flex items-center gap-1.5";
+                showToast("تم الدخول بنجاح كمسؤول القاعات 🔑");
+                renderLogTable();
+                renderPendingList();
+            } else {
+                showToast("الرقم السري غير صحيح!", true);
+            }
+        }
+
+        function toggleBookingPolicy(required) {
+            isApprovalRequired = required;
+            const btnB = document.getElementById('policyBtnTypeB');
+            const btnA = document.getElementById('policyBtnTypeA');
+
+            if (required) {
+                btnB.className = "px-3 py-1.5 rounded-lg bg-teal-700 text-white font-bold";
+                btnA.className = "px-3 py-1.5 rounded-lg bg-slate-200 text-slate-700 font-bold";
+                showToast("تم اعتماد سياسة: بموافقة مسؤول القاعات (الخيار ب)");
+            } else {
+                btnA.className = "px-3 py-1.5 rounded-lg bg-teal-700 text-white font-bold";
+                btnB.className = "px-3 py-1.5 rounded-lg bg-slate-200 text-slate-700 font-bold";
+                showToast("تم اعتماد سياسة: الحجز المباشر التلقائي (الخيار أ)");
+            }
+        }
+
+        // --- PENDING REQUESTS PANEL ---
+        function updatePendingBadge() {
+            const count = bookings.filter(b => b.status === 'pending').length;
+            const badge = document.getElementById('pendingBadgeCount');
+            if (count > 0) {
+                badge.textContent = count;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        function renderPendingList() {
+            const container = document.getElementById('pendingListContainer');
+            const pendingBookings = bookings.filter(b => b.status === 'pending');
+
+            if (pendingBookings.length === 0) {
+                container.innerHTML = `<div class="text-center py-8 text-slate-400 font-bold text-sm bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    <i class="fa-solid fa-circle-check text-2xl text-emerald-500 mb-2"></i>
+                    <div>لا توجد طلبات حجز بانتظار الموافقة حالياً</div>
+                </div>`;
+                return;
+            }
+
+            container.innerHTML = '';
+            pendingBookings.forEach(b => {
+                const hallName = HALLS[b.hallId] ? HALLS[b.hallId].name : b.hallId;
+                const card = document.createElement('div');
+                card.className = "p-4 rounded-2xl bg-amber-50/60 border border-amber-200 flex flex-wrap items-center justify-between gap-3 shadow-sm";
+                card.innerHTML = `
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2">
+                            <span class="font-mono font-bold bg-amber-200 text-amber-900 px-2 py-0.5 rounded text-xs">${b.id}</span>
+                            <span class="font-extrabold text-slate-900 text-sm">${b.title}</span>
+                        </div>
+                        <div class="text-xs text-slate-600 space-x-3 space-x-reverse">
+                            <span><i class="fa-solid fa-building me-1"></i>${b.dept}</span>
+                            <span><i class="fa-solid fa-door-open me-1"></i>${hallName}</span>
+                            <span><i class="fa-solid fa-calendar me-1"></i>${b.date} (${b.timeSlot})</span>
+                        </div>
+                        <div class="text-xs text-slate-500">مقدم الطلب: ${b.applicant} | تحويلة: ${b.phone} | المحاضر: ${b.lecturer}</div>
+                    </div>
+                    
+                    <div class="flex items-center gap-2">
+                        <button onclick="approveBooking('${b.id}')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow transition">
+                            <i class="fa-solid fa-check me-1"></i> اعتماد
+                        </button>
+                        <button onclick="rejectBooking('${b.id}')" class="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow transition">
+                            <i class="fa-solid fa-xmark me-1"></i> رفض
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function approveBooking(id) {
+            const b = bookings.find(x => x.id === id);
+            if (b) {
+                b.status = 'approved';
+                saveBookingsState();
+                renderScheduleGrid();
+                renderLogTable();
+                renderPendingList();
+                syncToGoogleSheet(b, 'update_status');
+                showToast(`تم اعتماد الحجز (${id}) وتثبيته في Google Sheets 🟢`);
+            }
+        }
+
+        function rejectBooking(id) {
+            const b = bookings.find(x => x.id === id);
+            if (b) {
+                b.status = 'rejected';
+                saveBookingsState();
+                renderScheduleGrid();
+                renderLogTable();
+                renderPendingList();
+                // 🔥 إرسال أمر الحذف المباشر إلى Google Sheets
+                syncToGoogleSheet(b, 'delete');
+                showToast(`تم رفض طلب الحجز (${id}) وحذفه تلقائياً من Google Sheets ❌`);
+            }
+        }
+
+        function deleteBooking(id) {
+            if (confirm(`هل أنت متأكد من حذف الحجز (${id})؟`)) {
+                const b = bookings.find(x => x.id === id);
+                bookings = bookings.filter(bItem => bItem.id !== id);
+                saveBookingsState();
+                renderScheduleGrid();
+                renderLogTable();
+                renderPendingList();
+                // 🔥 إرسال أمر الحذف المباشر إلى Google Sheets
+                if (b) syncToGoogleSheet(b, 'delete');
+                showToast(`تم حذف الحجز بنجاح وإزالته من Google Sheets 🗑️`);
+            }
+        }
+
+        function rejectBooking(id) {
+            const b = bookings.find(x => x.id === id);
+            if (b) {
+                b.status = 'rejected';
+                saveBookingsState();
+                renderScheduleGrid();
+                renderLogTable();
+                renderPendingList();
+                syncToGoogleSheet(b, 'update_status');
+                showToast(`تم رفض طلب الحجز (${id}) وتحديث حالته في Google Sheets ❌`);
+            }
+        }
+
+        function deleteBooking(id) {
+            if (confirm(`هل أنت تأكد من حذف الحجز (${id})؟`)) {
+                bookings = bookings.filter(b => b.id !== id);
+                saveBookingsState();
+                renderScheduleGrid();
+                renderLogTable();
+                renderPendingList();
+                showToast(`تم حذف الحجز بنجاح`);
+            }
+        }
+
+        // --- LOG TABLE ENGINE ---
+        function renderLogTable() {
+            const body = document.getElementById('logTableBody');
+            body.innerHTML = '';
+
+            if (bookings.length === 0) {
+                body.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-400">لا توجد حجوزات مسجلة</td></tr>`;
+                return;
+            }
+
+            bookings.forEach(b => {
+                const hallName = HALLS[b.hallId] ? HALLS[b.hallId].name : b.hallId;
+                let statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">⏳ في الانتظار</span>`;
+                if (b.status === 'approved') {
+                    statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">🔒 محجوز (مؤكد)</span>`;
+                } else if (b.status === 'rejected') {
+                    statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800">❌ مرفوض</span>`;
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition";
+                tr.innerHTML = `
+                    <td class="p-3 font-mono font-bold text-slate-700">${b.id}</td>
+                    <td class="p-3 font-bold text-teal-900">${hallName}</td>
+                    <td class="p-3"><div class="font-bold">${b.date}</div><div class="text-[11px] text-slate-500">${b.timeSlot}</div></td>
+                    <td class="p-3 font-semibold">${b.dept}</td>
+                    <td class="p-3 font-bold text-slate-800">${b.title}</td>
+                    <td class="p-3 text-slate-600">${b.lecturer}</td>
+                    <td class="p-3">${statusBadge}</td>
+                    <td class="p-3 text-center">
+                        <div class="flex items-center justify-center gap-1">
+                            <button onclick="showReceiptModal('${b.id}')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-xs">
+                                <i class="fa-solid fa-print"></i>
+                            </button>
+                            ${isAdmin ? `<button onclick="deleteBooking('${b.id}')" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg font-bold text-xs"><i class="fa-solid fa-trash"></i></button>` : ''}
+                        </div>
+                    </td>
+                `;
+                body.appendChild(tr);
+            });
+        }
+
+        function filterLogTable() {
+            const query = document.getElementById('logSearchInput').value.toLowerCase();
+            const rows = document.querySelectorAll('#logTableBody tr');
+            rows.forEach(tr => {
+                const text = tr.innerText.toLowerCase();
+                tr.style.display = text.includes(query) ? '' : 'none';
+            });
+        }
+
+        // --- CSV / EXCEL EXPORT ---
+        function exportBookingsToCSV() {
+            let csvContent = "\uFEFFرمز الحجز,القاعة,التاريخ,الوقت,القسم,عنوان الفعالية,المحاضر,مقدم الطلب,التحويلة,الحالة\n";
+            bookings.forEach(b => {
+                const hallName = HALLS[b.hallId] ? HALLS[b.hallId].name : b.hallId;
+                csvContent += `"${b.id}","${hallName}","${b.date}","${b.timeSlot}","${b.dept}","${b.title}","${b.lecturer}","${b.applicant}","${b.phone}","${b.status}"\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `حجوزات_مستشفى_الظهران_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            showToast("تم تصدير سجل الحجوزات إلى ملف Excel بنجاح 📊");
+        }
+
+        // --- GOOGLE SHEETS MODAL SETUP ---
+        function openGoogleSheetSyncModal() {
+            document.getElementById('googleScriptUrlInput').value = googleScriptAppUrl;
+            openModal('googleSheetsModal');
+        }
+
+        function saveGoogleScriptUrl() {
+            const url = document.getElementById('googleScriptUrlInput').value.trim();
+            googleScriptAppUrl = url;
+            localStorage.setItem('googleScriptAppUrl', url);
+            closeModal('googleSheetsModal');
+            showToast("تم حفظ رابط المزامنة وتفعيل الكتابة وجلب البيانات تلقائياً ⚙️");
+            
+            const syncStatusEl = document.getElementById('sheetSyncStatus');
+            if (syncStatusEl && url) {
+                syncStatusEl.innerHTML = `<i class="fa-solid fa-cloud-arrow-up text-xs text-emerald-300"></i> تم ربط الكتابة التلقائية وجلب البيانات من Google Sheets 🟢`;
+            }
+            fetchLiveSheetBookings(true);
+        }
+
+        function copyAppsScriptCode() {
+            const code = document.getElementById('appsScriptCodeText').innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                showToast("تم نسخ كود Apps Script للحافظة!");
+            });
+        }
+
+        // --- PRINTABLE RECEIPT MODAL ---
+        function showReceiptModal(bookingId) {
+            const b = bookings.find(x => x.id === bookingId);
+            if (!b) return;
+
+            const hallName = HALLS[b.hallId] ? HALLS[b.hallId].name : b.hallId;
+            document.getElementById('receiptCode').textContent = b.id;
+            document.getElementById('receiptHall').textContent = hallName;
+            document.getElementById('receiptDate').textContent = b.date;
+            document.getElementById('receiptTime').textContent = b.timeSlot;
+            document.getElementById('receiptDept').textContent = b.dept;
+            document.getElementById('receiptTitle').textContent = b.title;
+            document.getElementById('receiptLecturer').textContent = b.lecturer;
+            document.getElementById('receiptApplicant').textContent = `${b.applicant} (تحويلة: ${b.phone})`;
+            document.getElementById('receiptStatus').textContent = b.status === 'approved' ? 'مؤكد 🔒' : (b.status === 'pending' ? 'بانتظار الموافقة ⏳' : 'مرفوض ❌');
+
+            openModal('receiptModal');
+        }
+    </script>
+</body>
+</html>
